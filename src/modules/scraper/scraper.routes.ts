@@ -37,7 +37,7 @@ export default async function scraperRoutes(fastify: FastifyInstance) {
     ...auth,
   }, async (request, reply) => {
     const { productId } = request.params as { productId: string };
-    const result = await scrapeAndStore(fastify.db, productId);
+    const result = await scrapeAndStore(fastify.db, productId, fastify.mailer);
     reply.send(result);
   });
 
@@ -49,7 +49,7 @@ export default async function scraperRoutes(fastify: FastifyInstance) {
     },
     ...auth,
   }, async (request, reply) => {
-    const result = await scrapeAllTrackedProducts(fastify.db);
+    const result = await scrapeAllTrackedProducts(fastify.db, fastify.mailer);
     reply.send({ message: 'Scrape completed', ...result });
   });
 }

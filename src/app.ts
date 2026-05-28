@@ -7,11 +7,13 @@ import databasePlugin from './plugins/database';
 import jwtPlugin from './plugins/jwt';
 import swaggerPlugin from './plugins/swagger';
 import schedulerPlugin from './plugins/scheduler';
+import mailerPlugin from './plugins/mailer';
 
 import authRoutes from './modules/auth/auth.routes';
 import productRoutes from './modules/products/products.routes';
 import trackingRoutes from './modules/tracking/tracking.routes';
 import scraperRoutes from './modules/scraper/scraper.routes';
+import alertRoutes from './modules/alerts/alerts.routes';
 
 export function buildApp() {
   const fastify = Fastify({
@@ -34,6 +36,7 @@ export function buildApp() {
   fastify.register(swaggerPlugin);
   fastify.register(databasePlugin);
   fastify.register(jwtPlugin);
+  fastify.register(mailerPlugin);
   fastify.register(schedulerPlugin);
 
   fastify.get('/health', { schema: { tags: ['System'] } }, async () => ({
@@ -46,6 +49,7 @@ export function buildApp() {
   fastify.register(productRoutes, { prefix: '/api/v1/products' });
   fastify.register(trackingRoutes, { prefix: '/api/v1/tracking' });
   fastify.register(scraperRoutes, { prefix: '/api/v1/scraper' });
+  fastify.register(alertRoutes, { prefix: '/api/v1/alerts' });
 
   fastify.setErrorHandler((error, request, reply) => {
     const statusCode = (error as { statusCode?: number }).statusCode ?? error.statusCode ?? 500;
