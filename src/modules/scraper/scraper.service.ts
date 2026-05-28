@@ -1,6 +1,8 @@
 import axios from 'axios';
 import { load, type CheerioAPI } from 'cheerio';
 import type { Pool } from 'pg';
+import type { Transporter } from 'nodemailer';
+import { checkAndSendAlerts } from '../alerts/alerts.service';
 
 const USER_AGENTS = [
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
@@ -112,7 +114,7 @@ export async function scrapeProduct(url: string): Promise<ScrapeResult> {
   };
 }
 
-export async function scrapeAndStore(db: Pool, productId: string): Promise<ScrapeResult> {
+export async function scrapeAndStore(db: Pool, productId: string, mailer?: Transporter): Promise<ScrapeResult> {
   const productResult = await db.query('SELECT id, url, asin FROM products WHERE id = $1', [productId]);
   const product = productResult.rows[0];
   if (!product) throw Object.assign(new Error('Product not found'), { statusCode: 404 });
@@ -126,12 +128,16 @@ export async function scrapeAndStore(db: Pool, productId: string): Promise<Scrap
     );
 
     await db.query('UPDATE products SET updated_at = NOW() WHERE id = $1', [productId]);
+
+    if (mailer) {
+      await checkAndSendAlerts(db, mailer, productId, result.price);
+    }
   }
 
   return result;
 }
 
-export async function scrapeAllTrackedProducts(db: Pool): Promise<{ success: number; failed: number }> {
+export async function scrapeAllTrackedProducts(db: Pool, mailer?: Transporter): Promise<{ success: number; failed: number }> {
   const result = await db.query(
     `SELECT DISTINCT p.id, p.url
      FROM products p
@@ -144,7 +150,7 @@ export async function scrapeAllTrackedProducts(db: Pool): Promise<{ success: num
 
   for (const product of result.rows) {
     try {
-      await scrapeAndStore(db, product.id);
+      await scrapeAndStore(db, product.id, mailer);
       success++;
       // Small delay between requests to avoid rate limiting
       await new Promise(res => setTimeout(res, 2000 + Math.random() * 2000));

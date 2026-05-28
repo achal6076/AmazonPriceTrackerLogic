@@ -50,3 +50,16 @@ CREATE TABLE IF NOT EXISTS refresh_tokens (
 
 CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user
   ON refresh_tokens(user_id);
+
+CREATE TABLE IF NOT EXISTS price_alerts (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  tracking_id UUID NOT NULL REFERENCES tracked_products(id) ON DELETE CASCADE,
+  target_price NUMERIC(10,2) NOT NULL,
+  triggered_price NUMERIC(10,2) NOT NULL,
+  sent_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_price_alerts_tracking_sent
+  ON price_alerts(tracking_id, sent_at DESC);
