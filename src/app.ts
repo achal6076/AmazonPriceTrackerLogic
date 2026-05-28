@@ -6,6 +6,7 @@ import rateLimit from '@fastify/rate-limit';
 import databasePlugin from './plugins/database';
 import jwtPlugin from './plugins/jwt';
 import swaggerPlugin from './plugins/swagger';
+import schedulerPlugin from './plugins/scheduler';
 
 import authRoutes from './modules/auth/auth.routes';
 import productRoutes from './modules/products/products.routes';
@@ -33,6 +34,7 @@ export function buildApp() {
   fastify.register(swaggerPlugin);
   fastify.register(databasePlugin);
   fastify.register(jwtPlugin);
+  fastify.register(schedulerPlugin);
 
   fastify.get('/health', { schema: { tags: ['System'] } }, async () => ({
     status: 'ok',
