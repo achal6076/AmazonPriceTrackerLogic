@@ -10,6 +10,7 @@ import swaggerPlugin from './plugins/swagger';
 import authRoutes from './modules/auth/auth.routes';
 import productRoutes from './modules/products/products.routes';
 import trackingRoutes from './modules/tracking/tracking.routes';
+import scraperRoutes from './modules/scraper/scraper.routes';
 
 export function buildApp() {
   const fastify = Fastify({
@@ -42,6 +43,7 @@ export function buildApp() {
   fastify.register(authRoutes, { prefix: '/api/v1/auth' });
   fastify.register(productRoutes, { prefix: '/api/v1/products' });
   fastify.register(trackingRoutes, { prefix: '/api/v1/tracking' });
+  fastify.register(scraperRoutes, { prefix: '/api/v1/scraper' });
 
   fastify.setErrorHandler((error, request, reply) => {
     const statusCode = (error as { statusCode?: number }).statusCode ?? error.statusCode ?? 500;
