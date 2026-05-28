@@ -14,6 +14,7 @@ import productRoutes from './modules/products/products.routes';
 import trackingRoutes from './modules/tracking/tracking.routes';
 import scraperRoutes from './modules/scraper/scraper.routes';
 import alertRoutes from './modules/alerts/alerts.routes';
+import categoryRoutes from './modules/categories/categories.routes';
 
 export function buildApp() {
   const fastify = Fastify({
@@ -49,7 +50,8 @@ export function buildApp() {
   fastify.register(productRoutes, { prefix: '/api/v1/products' });
   fastify.register(trackingRoutes, { prefix: '/api/v1/tracking' });
   fastify.register(scraperRoutes, { prefix: '/api/v1/scraper' });
-  fastify.register(alertRoutes, { prefix: '/api/v1/alerts' });
+  fastify.register(alertRoutes,    { prefix: '/api/v1/alerts' });
+  fastify.register(categoryRoutes, { prefix: '/api/v1/categories' });
 
   fastify.setErrorHandler((error, request, reply) => {
     const statusCode = (error as { statusCode?: number }).statusCode ?? error.statusCode ?? 500;
