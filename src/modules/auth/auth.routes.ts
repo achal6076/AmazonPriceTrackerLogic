@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
-import { RegisterSchema, LoginSchema, RefreshSchema } from './auth.schemas';
-import { registerUser, loginUser, refreshAccessToken, logoutUser } from './auth.service';
+import { RegisterSchema, LoginSchema, RefreshSchema, UpdateProfileSchema } from './auth.schemas';
+import { registerUser, loginUser, refreshAccessToken, logoutUser, getUserProfile, updateUserProfile } from './auth.service';
 
 export default async function authRoutes(fastify: FastifyInstance) {
   fastify.post('/register', {
@@ -60,5 +60,31 @@ export default async function authRoutes(fastify: FastifyInstance) {
   }, async (request, reply) => {
     await logoutUser(fastify.db, request.user.sub);
     reply.send({ message: 'Logged out successfully' });
+  });
+
+  fastify.get('/me', {
+    schema: { tags: ['Auth'], security: [{ bearerAuth: [] }] },
+    preHandler: fastify.authenticate,
+  }, async (request, reply) => {
+    reply.send(await getUserProfile(fastify.db, request.user.sub));
+  });
+
+  fastify.patch('/me', {
+    schema: {
+      tags: ['Auth'],
+      security: [{ bearerAuth: [] }],
+      body: {
+        type: 'object',
+        properties: {
+          name: { type: 'string', minLength: 1, maxLength: 100 },
+          current_password: { type: 'string' },
+          new_password: { type: 'string', minLength: 8 },
+        },
+      },
+    },
+    preHandler: fastify.authenticate,
+  }, async (request, reply) => {
+    const input = UpdateProfileSchema.parse(request.body);
+    reply.send(await updateUserProfile(fastify.db, request.user.sub, input));
   });
 }

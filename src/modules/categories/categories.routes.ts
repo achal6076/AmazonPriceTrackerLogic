@@ -13,8 +13,7 @@ export default async function categoryRoutes(fastify: FastifyInstance) {
     schema: { tags: ['Categories'], security: [{ bearerAuth: [] }] },
     preHandler: fastify.authenticate,
   }, async (request, reply) => {
-    const user = (request as any).user as { id: string };
-    reply.send(await getCategories(fastify.db, user.id));
+    reply.send(await getCategories(fastify.db, request.user.sub));
   });
 
   fastify.post('/', {
@@ -33,9 +32,8 @@ export default async function categoryRoutes(fastify: FastifyInstance) {
     },
     preHandler: fastify.authenticate,
   }, async (request, reply) => {
-    const user  = (request as any).user as { id: string };
     const input = AddCategorySchema.parse(request.body);
-    reply.status(201).send(await addCategory(fastify.db, user.id, input));
+    reply.status(201).send(await addCategory(fastify.db, request.user.sub, input));
   });
 
   fastify.delete('/:id', {
@@ -46,9 +44,8 @@ export default async function categoryRoutes(fastify: FastifyInstance) {
     },
     preHandler: fastify.authenticate,
   }, async (request, reply) => {
-    const user = (request as any).user as { id: string };
     const { id } = request.params as { id: string };
-    await deleteCategory(fastify.db, user.id, id);
+    await deleteCategory(fastify.db, request.user.sub, id);
     reply.status(204).send();
   });
 }

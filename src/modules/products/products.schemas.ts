@@ -13,9 +13,11 @@ export const PaginationSchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(20),
 });
 
-export const HistoryQuerySchema = PaginationSchema.extend({
-  from: z.string().datetime().optional(),
-  to: z.string().datetime().optional(),
+export const HistoryQuerySchema = z.object({
+  page:  z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(500).default(50),
+  from:  z.string().datetime({ offset: true }).optional(),
+  to:    z.string().datetime({ offset: true }).optional(),
 });
 
 export type AddProductInput = z.infer<typeof AddProductSchema>;

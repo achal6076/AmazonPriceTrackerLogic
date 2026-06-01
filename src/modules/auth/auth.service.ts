@@ -2,7 +2,7 @@ import crypto from 'crypto';
 import bcrypt from 'bcrypt';
 import type { Pool } from 'pg';
 import type { FastifyInstance } from 'fastify';
-import type { RegisterInput, LoginInput } from './auth.schemas';
+import type { RegisterInput, LoginInput, UpdateProfileInput } from './auth.schemas';
 
 const BCRYPT_ROUNDS = 12;
 const REFRESH_TOKEN_EXPIRY_DAYS = 7;
@@ -86,6 +86,46 @@ export async function refreshAccessToken(
 
 export async function logoutUser(db: Pool, userId: string) {
   await db.query('DELETE FROM refresh_tokens WHERE user_id = $1', [userId]);
+}
+
+export async function getUserProfile(db: Pool, userId: string) {
+  const result = await db.query(
+    'SELECT id, email, name, created_at FROM users WHERE id = $1',
+    [userId],
+  );
+  if (!result.rows[0]) throw Object.assign(new Error('User not found'), { statusCode: 404 });
+  return result.rows[0];
+}
+
+export async function updateUserProfile(
+  db: Pool,
+  userId: string,
+  input: UpdateProfileInput,
+) {
+  if (input.new_password) {
+    const { rows } = await db.query('SELECT password_hash FROM users WHERE id = $1', [userId]);
+    if (!rows[0] || !(await bcrypt.compare(input.current_password!, rows[0].password_hash))) {
+      throw Object.assign(new Error('Current password is incorrect'), { statusCode: 400 });
+    }
+  }
+
+  const fields: string[] = [];
+  const values: unknown[] = [];
+  let idx = 1;
+
+  if (input.name !== undefined) { fields.push(`name = $${idx++}`); values.push(input.name); }
+  if (input.new_password) {
+    fields.push(`password_hash = $${idx++}`);
+    values.push(await bcrypt.hash(input.new_password, BCRYPT_ROUNDS));
+  }
+  fields.push(`updated_at = NOW()`);
+  values.push(userId);
+
+  const result = await db.query(
+    `UPDATE users SET ${fields.join(', ')} WHERE id = $${idx} RETURNING id, email, name, created_at`,
+    values,
+  );
+  return result.rows[0];
 }
 
 async function createRefreshToken(db: Pool, userId: string) {
