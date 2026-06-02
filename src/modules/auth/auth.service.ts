@@ -2,7 +2,13 @@ import crypto from 'crypto';
 import bcrypt from 'bcrypt';
 import type { Pool } from 'pg';
 import type { FastifyInstance } from 'fastify';
+import type { Transporter } from 'nodemailer';
 import type { RegisterInput, LoginInput, UpdateProfileInput } from './auth.schemas';
+
+const APP_NAME = 'PriceZap';
+const FROM_EMAIL = process.env.FROM_EMAIL ?? 'noreply@pricezap.com';
+const APP_URL = process.env.APP_URL ?? 'http://localhost:5173';
+const RESET_EXPIRY_MINUTES = 30;
 
 const BCRYPT_ROUNDS = 12;
 const REFRESH_TOKEN_EXPIRY_DAYS = 7;
@@ -126,6 +132,101 @@ export async function updateUserProfile(
     values,
   );
   return result.rows[0];
+}
+
+export async function sendForgotPassword(db: Pool, mailer: Transporter, email: string) {
+  const { rows } = await db.query('SELECT id, email FROM users WHERE email = $1', [email]);
+  // Always return success to prevent email enumeration
+  if (!rows[0]) return;
+
+  const token = crypto.randomBytes(32).toString('hex');
+  const tokenHash = hashToken(token);
+  const expiresAt = new Date(Date.now() + RESET_EXPIRY_MINUTES * 60 * 1000);
+
+  await db.query(
+    `INSERT INTO password_reset_tokens (user_id, token_hash, expires_at)
+     VALUES ($1, $2, $3)
+     ON CONFLICT DO NOTHING`,
+    [rows[0].id, tokenHash, expiresAt],
+  );
+
+  const resetUrl = `${APP_URL}/reset-password?token=${token}`;
+
+  await mailer.sendMail({
+    from: `${APP_NAME} <${FROM_EMAIL}>`,
+    to: email,
+    subject: `Reset your ${APP_NAME} password`,
+    html: `
+      <div style="font-family:system-ui,sans-serif;max-width:520px;margin:0 auto;padding:32px 24px;background:#fff">
+        <div style="text-align:center;margin-bottom:32px">
+          <div style="display:inline-flex;align-items:center;justify-content:center;width:52px;height:52px;background:#f59e0b;border-radius:14px;margin-bottom:16px">
+            <span style="font-size:24px">🛍</span>
+          </div>
+          <h1 style="font-size:22px;font-weight:800;color:#0f1117;margin:0">${APP_NAME}</h1>
+        </div>
+        <h2 style="font-size:20px;font-weight:700;color:#0f1117;margin:0 0 10px">Reset your password</h2>
+        <p style="color:#6b7280;font-size:15px;line-height:1.6;margin:0 0 28px">
+          We received a request to reset the password for your account.<br>
+          Click the button below to choose a new password.
+        </p>
+        <a href="${resetUrl}"
+           style="display:block;text-align:center;padding:14px 24px;background:linear-gradient(135deg,#6c63ff,#a78bfa);color:#fff;text-decoration:none;border-radius:12px;font-weight:700;font-size:15px;margin-bottom:24px">
+          Reset Password
+        </a>
+        <p style="color:#9ca3af;font-size:13px;line-height:1.6;margin:0 0 8px">
+          This link expires in <strong>${RESET_EXPIRY_MINUTES} minutes</strong>.<br>
+          If you didn't request a password reset, you can safely ignore this email.
+        </p>
+        <hr style="border:none;border-top:1px solid #f3f4f6;margin:24px 0">
+        <p style="color:#c4c9d4;font-size:12px;margin:0">
+          If the button doesn't work, paste this URL in your browser:<br>
+          <a href="${resetUrl}" style="color:#6c63ff;word-break:break-all">${resetUrl}</a>
+        </p>
+      </div>
+    `,
+  });
+}
+
+export async function resetPassword(db: Pool, token: string, newPassword: string) {
+  const tokenHash = hashToken(token);
+  const { rows } = await db.query(
+    `SELECT id, user_id FROM password_reset_tokens
+     WHERE token_hash = $1 AND used_at IS NULL AND expires_at > NOW()`,
+    [tokenHash],
+  );
+
+  if (!rows[0]) {
+    throw Object.assign(new Error('Invalid or expired reset link. Please request a new one.'), { statusCode: 400 });
+  }
+
+  const passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
+
+  await db.query('UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2', [passwordHash, rows[0].user_id]);
+  await db.query('UPDATE password_reset_tokens SET used_at = NOW() WHERE id = $1', [rows[0].id]);
+  // Invalidate all refresh tokens for security
+  await db.query('DELETE FROM refresh_tokens WHERE user_id = $1', [rows[0].user_id]);
+}
+
+export async function sendTestEmail(mailer: Transporter, to: string) {
+  await mailer.sendMail({
+    from: `${APP_NAME} <${FROM_EMAIL}>`,
+    to,
+    subject: `✅ ${APP_NAME} — Email is working!`,
+    html: `
+      <div style="font-family:system-ui,sans-serif;max-width:520px;margin:0 auto;padding:32px 24px;background:#fff">
+        <div style="text-align:center;margin-bottom:24px">
+          <div style="display:inline-flex;align-items:center;justify-content:center;width:52px;height:52px;background:#10b981;border-radius:14px;margin-bottom:12px">
+            <span style="font-size:26px">✅</span>
+          </div>
+          <h2 style="font-size:20px;font-weight:800;color:#0f1117;margin:0">Email is working!</h2>
+        </div>
+        <p style="color:#6b7280;font-size:15px;line-height:1.6;text-align:center;margin:0">
+          Your <strong>${APP_NAME}</strong> SMTP configuration is correct.<br>
+          You will now receive price drop alerts at this address.
+        </p>
+      </div>
+    `,
+  });
 }
 
 async function createRefreshToken(db: Pool, userId: string) {
