@@ -120,6 +120,7 @@ export default async function authRoutes(fastify: FastifyInstance) {
         type: 'object',
         properties: {
           name: { type: 'string', minLength: 1, maxLength: 100 },
+          whatsapp_number: { type: 'string', nullable: true },
           current_password: { type: 'string' },
           new_password: { type: 'string', minLength: 8 },
         },
@@ -129,5 +130,25 @@ export default async function authRoutes(fastify: FastifyInstance) {
   }, async (request, reply) => {
     const input = UpdateProfileSchema.parse(request.body);
     reply.send(await updateUserProfile(fastify.db, request.user.sub, input));
+  });
+
+  fastify.get('/whatsapp/status', {
+    schema: { tags: ['Auth'], security: [{ bearerAuth: [] }] },
+    preHandler: fastify.authenticate,
+  }, async (_request, reply) => {
+    const { status, qrBase64 } = fastify.whatsapp;
+    reply.send({ status, qrBase64 });
+  });
+
+  fastify.post('/whatsapp/test', {
+    schema: { tags: ['Auth'], security: [{ bearerAuth: [] }] },
+    preHandler: fastify.authenticate,
+  }, async (request, reply) => {
+    const { rows } = await fastify.db.query('SELECT whatsapp_number FROM users WHERE id = $1', [request.user.sub]);
+    const number = rows[0]?.whatsapp_number;
+    if (!number) throw Object.assign(new Error('No WhatsApp number saved on your profile'), { statusCode: 400 });
+    const sent = await fastify.whatsapp.sendMessage(number, '✅ *PriceZap* — WhatsApp notifications are working!');
+    if (!sent) throw Object.assign(new Error('WhatsApp not connected. Please scan the QR code first.'), { statusCode: 503 });
+    reply.send({ message: `Test message sent to ${number}` });
   });
 }

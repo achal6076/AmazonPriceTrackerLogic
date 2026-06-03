@@ -1,5 +1,6 @@
 import type { Pool } from 'pg';
 import type { Transporter } from 'nodemailer';
+import type { WhatsAppState } from '../../plugins/whatsapp';
 
 const FROM_EMAIL = process.env.FROM_EMAIL ?? 'noreply@pricezap.com';
 const APP_NAME = 'PriceZap';
@@ -43,16 +44,33 @@ function buildEmailHtml(data: {
   `;
 }
 
+function buildWhatsAppMessage(data: {
+  productTitle: string;
+  productUrl: string;
+  targetPrice: number;
+  triggeredPrice: number;
+}): string {
+  const saved = (data.targetPrice - data.triggeredPrice).toFixed(2);
+  return (
+    `🎉 *PriceZap Alert!*\n\n` +
+    `*${data.productTitle}* has hit your target price!\n\n` +
+    `💰 *Current Price:* ₹${data.triggeredPrice.toFixed(2)}\n` +
+    `🎯 *Your Target:* ₹${data.targetPrice.toFixed(2)}\n` +
+    `💵 *You Save:* ₹${saved}\n\n` +
+    `🛒 Buy now: ${data.productUrl}`
+  );
+}
+
 export async function checkAndSendAlerts(
   db: Pool,
   mailer: Transporter,
   productId: string,
   currentPrice: number,
+  whatsapp?: WhatsAppState,
 ): Promise<void> {
-  // Find all active tracking entries for this product where price hit target
   const result = await db.query(
     `SELECT tp.id AS tracking_id, tp.target_price, tp.user_id,
-            u.email AS user_email,
+            u.email AS user_email, u.whatsapp_number,
             p.title AS product_title, p.url AS product_url
      FROM tracked_products tp
      JOIN users u ON u.id = tp.user_id
@@ -65,7 +83,6 @@ export async function checkAndSendAlerts(
   );
 
   for (const row of result.rows) {
-    // Skip if an alert was already sent for this tracking entry in the last 24 hours
     const recent = await db.query(
       `SELECT id FROM price_alerts
        WHERE tracking_id = $1 AND sent_at > NOW() - INTERVAL '24 hours'
@@ -74,7 +91,6 @@ export async function checkAndSendAlerts(
     );
     if (recent.rowCount && recent.rowCount > 0) continue;
 
-    // Record alert first to prevent duplicates under race conditions
     await db.query(
       `INSERT INTO price_alerts (user_id, product_id, tracking_id, target_price, triggered_price)
        VALUES ($1, $2, $3, $4, $5)`,
@@ -94,6 +110,18 @@ export async function checkAndSendAlerts(
         currency: 'INR',
       }),
     });
+
+    if (whatsapp && row.whatsapp_number) {
+      await whatsapp.sendMessage(
+        row.whatsapp_number,
+        buildWhatsAppMessage({
+          productTitle: row.product_title ?? 'Amazon Product',
+          productUrl: row.product_url,
+          targetPrice: parseFloat(row.target_price),
+          triggeredPrice: currentPrice,
+        }),
+      );
+    }
   }
 }
 

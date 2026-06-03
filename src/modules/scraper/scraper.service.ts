@@ -2,6 +2,7 @@ import axios from 'axios';
 import { load, type CheerioAPI } from 'cheerio';
 import type { Pool } from 'pg';
 import type { Transporter } from 'nodemailer';
+import type { WhatsAppState } from '../../plugins/whatsapp';
 import { checkAndSendAlerts } from '../alerts/alerts.service';
 
 const USER_AGENTS = [
@@ -114,7 +115,7 @@ export async function scrapeProduct(url: string): Promise<ScrapeResult> {
   };
 }
 
-export async function scrapeAndStore(db: Pool, productId: string, mailer?: Transporter): Promise<ScrapeResult> {
+export async function scrapeAndStore(db: Pool, productId: string, mailer?: Transporter, whatsapp?: WhatsAppState): Promise<ScrapeResult> {
   const productResult = await db.query('SELECT id, url, asin FROM products WHERE id = $1', [productId]);
   const product = productResult.rows[0];
   if (!product) throw Object.assign(new Error('Product not found'), { statusCode: 404 });
@@ -130,14 +131,14 @@ export async function scrapeAndStore(db: Pool, productId: string, mailer?: Trans
     await db.query('UPDATE products SET updated_at = NOW() WHERE id = $1', [productId]);
 
     if (mailer) {
-      await checkAndSendAlerts(db, mailer, productId, result.price);
+      await checkAndSendAlerts(db, mailer, productId, result.price, whatsapp);
     }
   }
 
   return result;
 }
 
-export async function scrapeAllTrackedProducts(db: Pool, mailer?: Transporter): Promise<{ success: number; failed: number }> {
+export async function scrapeAllTrackedProducts(db: Pool, mailer?: Transporter, whatsapp?: WhatsAppState): Promise<{ success: number; failed: number }> {
   const result = await db.query(
     `SELECT DISTINCT p.id, p.url
      FROM products p
@@ -150,7 +151,7 @@ export async function scrapeAllTrackedProducts(db: Pool, mailer?: Transporter): 
 
   for (const product of result.rows) {
     try {
-      await scrapeAndStore(db, product.id, mailer);
+      await scrapeAndStore(db, product.id, mailer, whatsapp);
       success++;
       // Small delay between requests to avoid rate limiting
       await new Promise(res => setTimeout(res, 2000 + Math.random() * 2000));

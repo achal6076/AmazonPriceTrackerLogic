@@ -19,7 +19,7 @@ export default fp(async function schedulerPlugin(fastify: FastifyInstance) {
     fastify.log.info('Scheduled scrape started');
 
     try {
-      const result = await scrapeAllTrackedProducts(fastify.db, fastify.mailer);
+      const result = await scrapeAllTrackedProducts(fastify.db, fastify.mailer, fastify.whatsapp);
       fastify.log.info({ result }, 'Scheduled scrape completed');
     } catch (err) {
       fastify.log.error({ err }, 'Scheduled scrape failed');

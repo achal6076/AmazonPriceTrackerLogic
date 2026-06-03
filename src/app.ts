@@ -8,6 +8,7 @@ import jwtPlugin from './plugins/jwt';
 import swaggerPlugin from './plugins/swagger';
 import schedulerPlugin from './plugins/scheduler';
 import mailerPlugin from './plugins/mailer';
+import whatsappPlugin from './plugins/whatsapp';
 
 import authRoutes from './modules/auth/auth.routes';
 import productRoutes from './modules/products/products.routes';
@@ -38,6 +39,7 @@ export function buildApp() {
   fastify.register(databasePlugin);
   fastify.register(jwtPlugin);
   fastify.register(mailerPlugin);
+  fastify.register(whatsappPlugin);
   fastify.register(schedulerPlugin);
 
   fastify.get('/health', { schema: { tags: ['System'] } }, async () => ({

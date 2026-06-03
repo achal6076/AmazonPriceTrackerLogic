@@ -16,6 +16,7 @@ export const RefreshSchema = z.object({
 
 export const UpdateProfileSchema = z.object({
   name: z.string().min(1).max(100).optional(),
+  whatsapp_number: z.string().regex(/^\+?[0-9]{7,15}$/).optional().nullable(),
   current_password: z.string().optional(),
   new_password: z.string().min(8).optional(),
 }).refine(d => !d.new_password || !!d.current_password, {

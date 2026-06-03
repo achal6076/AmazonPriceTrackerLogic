@@ -10,6 +10,7 @@ services:
       REDIS_URL: redis://redis:6379
     volumes:
       - ./src:/app/src
+      - wwebjs_auth:/app/.wwebjs_auth
     depends_on:
       postgres:
         condition: service_healthy
@@ -44,3 +45,4 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  wwebjs_auth:

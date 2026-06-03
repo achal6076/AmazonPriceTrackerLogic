@@ -96,7 +96,7 @@ export async function logoutUser(db: Pool, userId: string) {
 
 export async function getUserProfile(db: Pool, userId: string) {
   const result = await db.query(
-    'SELECT id, email, name, created_at FROM users WHERE id = $1',
+    'SELECT id, email, name, whatsapp_number, created_at FROM users WHERE id = $1',
     [userId],
   );
   if (!result.rows[0]) throw Object.assign(new Error('User not found'), { statusCode: 404 });
@@ -120,6 +120,7 @@ export async function updateUserProfile(
   let idx = 1;
 
   if (input.name !== undefined) { fields.push(`name = $${idx++}`); values.push(input.name); }
+  if ('whatsapp_number' in input) { fields.push(`whatsapp_number = $${idx++}`); values.push(input.whatsapp_number ?? null); }
   if (input.new_password) {
     fields.push(`password_hash = $${idx++}`);
     values.push(await bcrypt.hash(input.new_password, BCRYPT_ROUNDS));
@@ -128,7 +129,7 @@ export async function updateUserProfile(
   values.push(userId);
 
   const result = await db.query(
-    `UPDATE users SET ${fields.join(', ')} WHERE id = $${idx} RETURNING id, email, name, created_at`,
+    `UPDATE users SET ${fields.join(', ')} WHERE id = $${idx} RETURNING id, email, name, whatsapp_number, created_at`,
     values,
   );
   return result.rows[0];
