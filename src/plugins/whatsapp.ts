@@ -19,7 +19,10 @@ function removeSingletonLocks(dir: string) {
   try {
     if (!fs.existsSync(dir)) return;
     const lock = path.join(dir, 'SingletonLock');
-    if (fs.existsSync(lock)) fs.unlinkSync(lock);
+    try {
+      fs.lstatSync(lock); // lstatSync works on broken symlinks, existsSync does not
+      fs.unlinkSync(lock);
+    } catch { /* file genuinely doesn't exist */ }
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
       if (entry.isDirectory()) removeSingletonLocks(path.join(dir, entry.name));
     }
