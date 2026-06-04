@@ -82,12 +82,16 @@ export async function scrapeProduct(url: string): Promise<ScrapeResult> {
   const asin = extractAsin(url);
   if (!asin) throw Object.assign(new Error('Could not extract ASIN from URL'), { statusCode: 400 });
 
-  // Normalize to amazon.in
   const cleanUrl = `https://www.amazon.in/dp/${asin}`;
 
-  const response = await axios.get(cleanUrl, {
-    headers: buildHeaders(),
-    timeout: 15000,
+  const scraperApiKey = process.env.SCRAPER_API_KEY;
+  const fetchUrl = scraperApiKey
+    ? `https://api.scraperapi.com?api_key=${scraperApiKey}&url=${encodeURIComponent(cleanUrl)}&country_code=in`
+    : cleanUrl;
+
+  const response = await axios.get(fetchUrl, {
+    headers: scraperApiKey ? {} : buildHeaders(),
+    timeout: 60000,
     maxRedirects: 5,
   });
 
