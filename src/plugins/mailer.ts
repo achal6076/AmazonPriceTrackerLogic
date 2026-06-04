@@ -28,14 +28,12 @@ export default fp(async function mailerPlugin(fastify: FastifyInstance) {
       });
 
   if (hasSmtp) {
-    try {
-      await transporter.verify();
-      fastify.log.info('Mailer ready (SMTP connected)');
-    } catch (err) {
-      fastify.log.error({ err }, 'Mailer SMTP connection failed — check SMTP_HOST/USER/PASS in .env');
-    }
+    // Verify in background — don't block startup
+    transporter.verify()
+      .then(() => fastify.log.info('Mailer ready (SMTP connected)'))
+      .catch((err) => fastify.log.error({ err }, 'Mailer SMTP connection failed — check SMTP_HOST/USER/PASS'));
   } else {
-    fastify.log.warn('Mailer running in NO-OP mode — set SMTP_HOST, SMTP_USER, SMTP_PASS in .env to send real emails');
+    fastify.log.warn('Mailer running in NO-OP mode — set SMTP_HOST, SMTP_USER, SMTP_PASS to send real emails');
   }
 
   fastify.decorate('mailer', transporter);
