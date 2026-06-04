@@ -1,3 +1,5 @@
+import fs from 'fs';
+import path from 'path';
 import fp from 'fastify-plugin';
 import type { FastifyInstance } from 'fastify';
 
@@ -11,6 +13,17 @@ declare module 'fastify' {
   interface FastifyInstance {
     whatsapp: WhatsAppState;
   }
+}
+
+function removeSingletonLocks(dir: string) {
+  try {
+    if (!fs.existsSync(dir)) return;
+    const lock = path.join(dir, 'SingletonLock');
+    if (fs.existsSync(lock)) fs.unlinkSync(lock);
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (entry.isDirectory()) removeSingletonLocks(path.join(dir, entry.name));
+    }
+  } catch { /* ignore */ }
 }
 
 const disabled: WhatsAppState = {
@@ -34,10 +47,19 @@ export default fp(async function whatsappPlugin(fastify: FastifyInstance) {
     return;
   }
 
+  // Delete any stale Chromium lock files left by a previous container
+  removeSingletonLocks('/app/.wwebjs_auth');
+
   const client = new Client({
     authStrategy: new LocalAuth({ dataPath: '/app/.wwebjs_auth' }),
     puppeteer: {
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+        '--single-process',
+      ],
       executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
     },
   });
