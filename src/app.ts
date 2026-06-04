@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import Fastify from 'fastify';
 import helmet from '@fastify/helmet';
+import cors from '@fastify/cors';
 import rateLimit from '@fastify/rate-limit';
 
 import databasePlugin from './plugins/database';
@@ -29,6 +30,10 @@ export function buildApp() {
   });
 
   fastify.register(helmet, { contentSecurityPolicy: false });
+  fastify.register(cors, {
+    origin: process.env.APP_URL ?? true,
+    credentials: true,
+  });
   fastify.register(rateLimit, {
     max: 100,
     timeWindow: '15 minutes',
