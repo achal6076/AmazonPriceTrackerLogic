@@ -13,7 +13,7 @@ export default async function scraperRoutes(fastify: FastifyInstance) {
         type: 'object',
         required: ['url'],
         properties: {
-          url: { type: 'string', format: 'uri' },
+          url: { type: 'string', minLength: 5 },
         },
       },
     },

@@ -78,9 +78,42 @@ function extractAsin(url: string): string | null {
   return match ? match[1] : null;
 }
 
-export async function scrapeProduct(url: string): Promise<ScrapeResult> {
+function normalizeUrl(raw: string): string {
+  const trimmed = raw.trim();
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  return `https://${trimmed}`;
+}
+
+function isShortUrl(url: string): boolean {
+  return /amzn\.(in|to|eu|com|asia)/i.test(url);
+}
+
+async function resolveShortUrl(url: string): Promise<string> {
+  try {
+    const response = await axios.get(url, {
+      headers: buildHeaders(),
+      timeout: 15000,
+      maxRedirects: 10,
+      // capture the final URL after all redirects
+    });
+    return response.request?.res?.responseUrl ?? response.config?.url ?? url;
+  } catch (err: any) {
+    // axios throws on non-2xx but still gives us the redirect chain
+    if (err.request?.res?.responseUrl) return err.request.res.responseUrl;
+    throw Object.assign(new Error('Could not resolve short URL — check your internet connection and try again'), { statusCode: 400 });
+  }
+}
+
+export async function scrapeProduct(rawUrl: string): Promise<ScrapeResult> {
+  let url = normalizeUrl(rawUrl);
+
+  // Resolve amzn.in / amzn.to short links to the full product URL first
+  if (isShortUrl(url)) {
+    url = await resolveShortUrl(url);
+  }
+
   const asin = extractAsin(url);
-  if (!asin) throw Object.assign(new Error('Could not extract ASIN from URL'), { statusCode: 400 });
+  if (!asin) throw Object.assign(new Error('Could not extract ASIN from URL. Make sure the link points to an Amazon product page.'), { statusCode: 400 });
 
   const cleanUrl = `https://www.amazon.in/dp/${asin}`;
 
