@@ -27,12 +27,15 @@ export async function startTracking(db: Pool, userId: string, input: StartTracki
      VALUES ($1, $2, $3)
      ON CONFLICT (user_id, product_id) DO UPDATE SET
        target_price = EXCLUDED.target_price,
-       is_active = TRUE,
-       created_at = NOW()
-     RETURNING *`,
+       is_active = TRUE
+     RETURNING *, (xmax = 0) AS is_new`,
     [userId, input.product_id, input.target_price ?? null],
   );
-  return result.rows[0];
+  const row = result.rows[0];
+  if (!row.is_new) {
+    throw Object.assign(new Error('You are already tracking this product'), { statusCode: 409 });
+  }
+  return row;
 }
 
 export async function updateTracking(
