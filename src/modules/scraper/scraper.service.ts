@@ -78,10 +78,20 @@ function extractAsin(url: string): string | null {
   return match ? match[1] : null;
 }
 
-function normalizeUrl(raw: string): string {
+function extractUrlFromText(raw: string): string {
   const trimmed = raw.trim();
-  if (/^https?:\/\//i.test(trimmed)) return trimmed;
-  return `https://${trimmed}`;
+  // If the whole string is already a URL, return it as-is
+  if (/^https?:\/\/\S+$/i.test(trimmed) || /^amzn\.\S+$/i.test(trimmed)) return trimmed;
+  // Find a URL embedded in a longer string (e.g. "Product title https://amzn.in/d/xxx")
+  const match = trimmed.match(/https?:\/\/\S+/i) ?? trimmed.match(/amzn\.[a-z]{2,}\/\S+/i);
+  if (match) return match[0];
+  return trimmed;
+}
+
+function normalizeUrl(raw: string): string {
+  const url = extractUrlFromText(raw);
+  if (/^https?:\/\//i.test(url)) return url;
+  return `https://${url}`;
 }
 
 function isShortUrl(url: string): boolean {
