@@ -15,4 +15,11 @@ export default fp(async (fastify: FastifyInstance) => {
       reply.status(401).send({ error: 'Unauthorized' });
     }
   });
+
+  fastify.decorate('requireAdmin', async (request: FastifyRequest, reply: FastifyReply) => {
+    const { rows } = await fastify.db.query('SELECT role FROM users WHERE id = $1', [request.user.sub]);
+    if (rows[0]?.role !== 'admin') {
+      reply.status(403).send({ error: 'Admin access required' });
+    }
+  });
 });

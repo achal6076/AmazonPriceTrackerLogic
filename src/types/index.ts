@@ -2,6 +2,7 @@ export interface User {
   id: string;
   email: string;
   password_hash: string;
+  role: 'user' | 'admin';
   created_at: Date;
   updated_at: Date;
 }
@@ -57,5 +58,6 @@ declare module '@fastify/jwt' {
 declare module 'fastify' {
   interface FastifyInstance {
     authenticate: (request: import('fastify').FastifyRequest, reply: import('fastify').FastifyReply) => Promise<void>;
+    requireAdmin: (request: import('fastify').FastifyRequest, reply: import('fastify').FastifyReply) => Promise<void>;
   }
 }
